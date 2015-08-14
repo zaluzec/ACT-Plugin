@@ -1,0 +1,202 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Data;
+using System.Text;
+using System.Windows.Forms;
+using Advanced_Combat_Tracker;
+using System.IO;
+using System.Reflection;
+using System.Xml;
+using MySql.Data.MySqlClient;
+using System.Threading;
+
+[assembly: AssemblyTitle("Sample Plugin")]
+[assembly: AssemblyDescription("A sample of an ACT plugin that is a UserControl and uses a settings file")]
+[assembly: AssemblyCompany("Aditu of Permafrost")]
+[assembly: AssemblyVersion("1.0.0.1")]
+
+namespace ACT_Plugin
+{
+    public class PluginSample : UserControl, IActPluginV1
+    {
+        #region Designer Created Code (Avoid editing)
+        /// <summary> 
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary> 
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Component Designer generated code
+
+        /// <summary> 
+        /// Required method for Designer support - do not modify 
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            this.SuspendLayout();
+            // 
+            // PluginSample
+            // 
+            this.Name = "PluginSample";
+            this.Size = new System.Drawing.Size(487, 392);
+            this.ResumeLayout(false);
+
+        }
+
+        #endregion
+
+        private TextBox charName;
+
+        #endregion
+        private Button button1;
+        public Label label1;
+        static string character = "default";
+        static bool change = false;
+        Thread thread;
+
+        public PluginSample()
+        {
+            InitializeComponent();
+        }
+
+        Label lblStatus;
+        string settingsFile = Path.Combine(ActGlobals.oFormActMain.AppDataFolder.FullName, "Config\\PluginSample.config.xml");
+        SettingsSerializer xmlSettings;
+
+        #region IActPluginV1 Members
+        public void InitPlugin(TabPage pluginScreenSpace, Label pluginStatusText)
+        {
+            lblStatus = pluginStatusText;
+            pluginScreenSpace.Controls.Add(this);
+
+
+            lblStatus = pluginStatusText;
+
+            ToText t = new ToText();
+
+            thread = new Thread(new ThreadStart(t.start));
+
+            thread.Start();
+
+            while (!thread.IsAlive) ;
+
+            lblStatus.Text = "Plugin Started";
+        }
+        public void DeInitPlugin()
+        {
+            // Unsubscribe from any events you listen to when exiting!
+            ActGlobals.oFormActMain.AfterCombatAction -= oFormActMain_AfterCombatAction;
+            thread.Abort();
+            MySqlConnection connection = new MySqlConnection("SERVER=db4free.net;PORT=3306;DATABASE=ffxivtestdb;UID=qwer1113;PWD=qazwsx;");
+            String query = "DELETE FROM Encounters WHERE Name ='" + character + "'";
+            MySqlCommand c = new MySqlCommand(query, connection);
+            c.ExecuteNonQuery();
+            c.Parameters.Clear();
+            connection.Close();
+            lblStatus.Text = "Plugin Exited";
+        }
+        #endregion
+
+        void oFormActMain_AfterCombatAction(bool isImport, CombatActionEventArgs actionInfo)
+        {
+
+        }
+
+
+        public partial class ToText
+        {
+
+
+            public void start()
+            {
+
+                while (true)
+                {
+                    Font font = new Font("Times New Roman", 12.0f);
+                    string s = "";
+
+                    string playerFormat = "<tr><td>{Job}</td> <td>{NAME8}</td>  <td>{ENCDPS}</td>  <td>{damage%}</td>  <td>{misses}</td> <td>{deaths}</td>  <td>{crithit%}</td> </tr>";
+                    string sorting = "EncDPS";
+                    string alliesFormat = "{duration} <br> {title} <br> Max Hit: {maxhit} <br> Total DPS: {encdps} <br><br> <tr> <td>Job</td> <td>Name</td>  <td>DPS</td>  <td>Percentage</td>  <td>Misses</td> <td>Deaths</td> <td>Critical Hit Percentage</td> </tr>";
+
+
+                    try
+                    {
+                        TextExportFormatOptions exportFormat = new TextExportFormatOptions(playerFormat, sorting, true, true, alliesFormat);
+                        List<ZoneData> zoneData = ActGlobals.oFormActMain.ZoneList;
+
+                        EncounterData encounter = zoneData[zoneData.Count - 1].ActiveEncounter;
+                        s += ActGlobals.oFormActMain.GetTextExport(encounter, exportFormat);
+                    }
+                    catch (Exception)
+                    {
+                        s += "Unable to obtain data";
+                    }
+                    s = replace(s);
+                    StreamWriter st = new StreamWriter("C:\\Users\\Kalin\\Desktop\\parse.html");
+
+
+                    st.WriteLine("<!DOCTYPE html>");
+                    st.WriteLine("<html>");
+                    st.WriteLine("<head>");
+                    st.WriteLine("<meta http-equiv=\"refresh\" content=\"2\" >");
+                    st.WriteLine("</head>");
+                    st.WriteLine("<body>");
+                    st.WriteLine("<font size=\"6\"><FONT FACE=\"arial\">");
+                    st.WriteLine("<table style=\"width:100%\">");
+                    //st.WriteLine("<tr><td>Job<\td><td>Name</td>  <td>DPS</td>  <td>Damage</td>  <td>Misses</td>  <td>Critical Hit Percentage</td> </tr>");
+                    st.WriteLine(s.ToString());
+                    st.WriteLine("</table>");
+                    st.WriteLine("</FONT></font>");
+                    st.WriteLine("</body>");
+                    st.WriteLine("</html>");
+
+                    st.Close();
+
+                    Thread.Sleep(1000);
+                }
+
+
+            }
+        public string replace(String s)
+        {
+            string newString = s;
+            string toReturn = "";
+            for (int a = 0; a < newString.Length - 2; a++)
+            {
+                if (newString[a] == 'Y' && newString[a + 1] == 'O' && newString[a + 2] == 'U')
+                {
+                    toReturn = newString.Substring(0, a);
+                    toReturn += "Sigma Kl";
+                    toReturn += newString.Substring(a + 3, newString.Length - a - 3);
+                }
+            }
+            return toReturn;
+        }
+    
+
+
+
+
+        };
+
+
+
+
+    }
+}
